@@ -199,8 +199,9 @@ local function send_raw_command(driver,device,command)
   client_functions.check_connection(driver,device)
   if DEVICE_MAP[device.device_network_id].sock then
     for _, cmd in ipairs(cmds) do
-      if (string.match(command, "PAUSE") == "PAUSE") then
-        local s = tonumber(string.sub(command, 6))
+        log.trace("Processing command: " .. cmd);
+      if (string.match(cmd, "PAUSE") == "PAUSE") then
+        local s = tonumber(string.sub(cmd, 6))
         log.trace("send_raw_command(): sleeping for " .. s .. " seconds");
         socket.sleep(1);
         log.trace("send_raw_command(): slept for " .. s .. " seconds");
