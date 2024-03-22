@@ -1,5 +1,5 @@
-name: 'Onkyo Receiver'
-packageKey: 'onkyo-receiver'
+name: 'Dan Onkyo Receiver'
+packageKey: 'dan-onkyo-receiver'
 permissions:
   lan: {}
   discovery: {}

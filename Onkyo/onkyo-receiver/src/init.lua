@@ -25,6 +25,7 @@ local config = require("config")
 local inputCapability = config.inputCapability
 local commandCapability = config.commandCapability
 local get_inputs = require("inputs")
+local socket = require("cosock.socket") -- for delay
 
 DEVICE_MAP = {}
 
@@ -40,25 +41,7 @@ local function source_list(device)
   return sources
 end
 
---- @param driver Driver
---- @param device st.Device
-local function info_changed(driver,device,event,args)
-  if args.old_st_store.preferences.zoneCount ~= device.preferences.zoneCount then
-    local mode = tonumber(device.preferences.zoneCount)
-    local create_device_msg = {
-      profile = (mode==2) and 'onkyo-zone2' or 'onkyo',
-    }
-    assert (device:try_update_metadata(create_device_msg), "Failed to change device")
-    log.warn(string.format('Changed to %s profile. App restart may be required.',create_device_msg.profile))
-  end
-  local sources = source_list(device)
-  local evt = inputCapability.supportedInputSources({value=sources})
-  evt.visibility = {displayed = false}
-  device:emit_component_event(device.profile.components['main'],evt)
-  if device:component_exists('zone2') then
-    device:emit_component_event(device.profile.components['zone2'],evt)
-  end
-end
+
 
 --- Called whenever a command is sent. If a message is not received from the device within 1 second,
 --- query the attribute. If another 4 seconds pass, assume the connection has dropped and reconnect.
@@ -66,6 +49,7 @@ end
 --- @param driver Driver
 --- @param device st.Device
 local function wait_for_response(driver,device,component,capability,attribute)
+  
   local function do_reconnect()
     log.warn(string.format('%s CONNECTION DROPPED',device.device_network_id))
     device.thread:cancel_timer(DEVICE_MAP[device.device_network_id].response)
@@ -132,18 +116,80 @@ end
 local function refresh_handler(driver,device,command)
   log.trace('REFRESH')
   local map = cap_map(device)
+  log.info("In refresh_handler(): device.profile.id is " .. device.profile.id)
   for _, comp in pairs(device.profile.components) do
+    log.info("In refresh_handler(): looping on comp.id=" .. comp.id);
     for _, cap in pairs(comp.capabilities) do
+      log.info("  In refresh_handler(): looping on cap.id=" .. cap.id);
       if (map[comp.id] or {})[cap.id] then
+        log.info("  In refresh_handler(): found map");
         for attr, _ in pairs(map[comp.id][cap.id]) do
+          log.info("  In refresh_hander(); looping on attr=" .. attr);
           local msg = build_eiscp(device,comp.id,cap.id,attr,'query')
-          if msg and DEVICE_MAP[device.device_network_id].sock then DEVICE_MAP[device.device_network_id].sock:send(msg) end
+          if msg and DEVICE_MAP[device.device_network_id].sock then 
+            log.info("    In refresh_handler(): sending this query command: " .. msg);
+            DEVICE_MAP[device.device_network_id].sock:send(msg)
+          else
+            log.info("    In refresh_ahndler(): NOT sending this query command: " .. msg);
+          end
+        
         end
+      else
+        log.info("  In refresh_handler(): didn't find map");
       end
     end
+    log.info("In refresh_handler(): done looping on comp.id=" ..comp.id);
+    log.info("In refresh_handler(): calling wait_for_response for switch " .. comp.id);
+    wait_for_response(driver,device,comp.id,'switch','switch') -- dan put this here
+    log.info("In refresh_handler(): called wait_for_response for switch " .. comp.id);
+
+    log.info("In refresh_handler(): calling wait_for_response for audioVolume " .. comp.id);
+    wait_for_response(driver,device,comp.id,'audioVolume','audioVolume') -- dan put this here
+    log.info("In refresh_handler(): called wait_for_response for audioVolume " .. comp.id);
+
+
   end
-  wait_for_response(driver,device,'main','switch','switch')
+  -- wait_for_response(driver,device,'main','switch','switch')
+
+  log.info("In refresh_handler(): ALL DONE!");
 end
+
+
+--- @param driver Driver
+--- @param device st.Device
+local function info_changed(driver,device,event,args)
+  log.info("**************** info_changed()");
+  -- if args.old_st_store.preferences.zoneCount ~= device.preferences.zoneCount then
+    local mode = tonumber(device.preferences.zoneCount)
+    log.info("mode is ", mode);
+    local profileName = "onkyo";
+    local create_device_msg = {
+      profile = profileName,
+    }
+    assert (device:try_update_metadata(create_device_msg), "Failed to change device")
+    log.warn(string.format('Changed to %s profile. App restart may be required.',create_device_msg.profile))
+
+    --
+    -- Try refreshing
+    --
+    refresh_handler(driver,device)
+
+  -- end
+  local sources = source_list(device)
+  local evt = inputCapability.supportedInputSources({value=sources})
+  evt.visibility = {displayed = false}
+  device:emit_component_event(device.profile.components['main'],evt)
+  if device:component_exists('zone2') then
+    log.info("emitting zone2 input capability component");
+    device:emit_component_event(device.profile.components['zone2'],evt)
+  end
+  if device:component_exists('zone3') then
+    log.info("emitting zone3 input capability component");
+    device:emit_component_event(device.profile.components['zone3'],evt)
+  end
+end
+
+
 
 --- @param driver Driver
 --- @param device st.Device
@@ -153,7 +199,14 @@ local function send_raw_command(driver,device,command)
   client_functions.check_connection(driver,device)
   if DEVICE_MAP[device.device_network_id].sock then
     for _, cmd in ipairs(cmds) do
-      DEVICE_MAP[device.device_network_id].sock:send(wrap(cmd))
+      if (string.match(command, "PAUSE") == "PAUSE") then
+        local s = tonumber(string.sub(command, 6))
+        log.trace("send_raw_command(): sleeping for " .. s .. " seconds");
+        socket.sleep(1);
+        log.trace("send_raw_command(): slept for " .. s .. " seconds");
+      else
+        DEVICE_MAP[device.device_network_id].sock:send(wrap(cmd))
+      end
     end
   end
   wait_for_response(driver,device)
@@ -180,6 +233,9 @@ local function init(driver,device,command)
   device:emit_component_event(device.profile.components['main'],evt)
   if device:component_exists('zone2') then
     device:emit_component_event(device.profile.components['zone2'],evt)
+  end
+  if device:component_exists('zone3') then
+    device:emit_component_event(device.profile.components['zone3'],evt)
   end
   client_functions.check_connection(driver,device)
   keep_alive(driver,device)

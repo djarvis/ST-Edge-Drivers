@@ -76,8 +76,36 @@ local function map(device)
             [inputCapability.ID] = {
                 [inputCapability.inputSource.ID] = get_inputs(device),
             },
+        },
+        ['zone3'] = {
+            [caps.switch.ID] = {
+                [caps.switch.switch.ID] = {
+                    cmd = 'PW3',
+                    on = '01',
+                    off = '00',
+                    query = 'QSTN',
+                },
+            },
+            [caps.audioMute.ID] = {
+                [caps.audioMute.mute.ID] = {
+                    cmd = 'MT3',
+                    muted = '01',
+                    unmuted = '00',
+                    query = 'QSTN',
+                },
+            },
+            [caps.audioVolume.ID] = {
+                [caps.audioVolume.volume.ID] = {
+                    cmd = 'VL3',
+                    query = 'QSTN'
+                },
+            },
+            [inputCapability.ID] = {
+                [inputCapability.inputSource.ID] = get_inputs(device),
+            },
         }
     }
+    commands['zone3'][inputCapability.ID][inputCapability.inputSource.ID].cmd = 'SL3'
     commands['zone2'][inputCapability.ID][inputCapability.inputSource.ID].cmd = 'SLZ'
     commands['main'][inputCapability.ID][inputCapability.inputSource.ID].cmd = 'SLI'
     return commands
