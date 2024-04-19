@@ -1,4 +1,7 @@
 # SmartThings Edge Drivers
+
+I forked and modified this to include a 3rd zone for my Onkyo receiver and I also added a "PAUSE" command for raw command input since certain commands wouldn't work without a pause.
+
 Channel invitations are available in the linked SmartThings Community topics. Drivers that lack a SmartThings Community topic have not been shared to a publicly-available channel.
 
 # Consolidated Drivers
