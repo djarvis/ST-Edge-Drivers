@@ -203,7 +203,7 @@ local function send_raw_command(driver,device,command)
       if (string.match(cmd, "PAUSE") == "PAUSE") then
         local s = tonumber(string.sub(cmd, 6))
         log.trace("send_raw_command(): sleeping for " .. s .. " seconds");
-        socket.sleep(1);
+        socket.sleep(s);
         log.trace("send_raw_command(): slept for " .. s .. " seconds");
       else
         DEVICE_MAP[device.device_network_id].sock:send(wrap(cmd))
